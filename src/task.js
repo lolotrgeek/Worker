@@ -31,6 +31,7 @@ class Task {
     start() {
 
     }
+    
 }
 
 module.exports = { Task }
