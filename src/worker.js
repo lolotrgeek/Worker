@@ -1,45 +1,62 @@
+'use strict'
 const { randomUUID } = require('crypto')
 const { Ledger } = require('basic-ledger')
-const { Task } = require('./src/task')
+const { Task } = require('./task')
+const { Account } = require('./account')
+const { Action } = require('./action')
 
 class Worker {
     constructor() {
         this.id = randomUUID()
         this.ledger = new Ledger(this.id)
-        
-        // store the public key of account on the ledger
+        this.account = new Account()
 
-        // TODO: listen for tasks, choose ones we'd "like" to do.
+        const { publicKey, privateKey, passphrase } = this.account.create_account()
+
+        this.publicKey = publicKey
+        this.privateKey = privateKey // TODO: remove
+        this.passphrase = passphrase // TODO: remove
 
     }
 
     create_task() {
-        let task = new Task()
+        const task = new Task(this.id)
         this.ledger.put(task.id, task)
+        return task
     }
 
-    find_task() {
+    get_task(task_id) {
+        return this.ledger.get(task_id)
+    }
+
+    is_task(entry) {
+        return typeof entry.key === 'string' && entry.key.slice(0, 4) === 'task'
+    }
+
+    get_tasks(filter) {
         let entries = this.ledger.get_all()
-        console.log(entries)
+        return entries.filter(entry => this.is_task(entry) && filter ? filter(entry) : true).map(entry => entry.value)
     }
 
-    redeem() {
-        
+    get_my_tasks() {
+        return this.get_tasks(task => task.creator === this.id)
+    }
 
-        // transaction: convert impact to stake
-
-        // get amount of impact this address has in ledger
-        
-        // give me the private key to sign this transaction
-
-        // post to ledger as a task to validate
-
-        // validation = does private
+    get_impact() {
 
     }
 
-    update() {
+    create_action(data, task_id) {
+        const action = new Action(data, task_id, this.id)
+        this.ledger.put("action", action)
+    }
 
+    redeem(amount) {
+        // the mechanism for converting impact to stake is sending impact to self
+        let tx = this.account.create_transaction(this.id, this.id, amount)
+        let signature = this.account.sign_transaction(this.privateKey, this.passphrase, tx)
+        let signed_tx = { tx, sig: signature.toString("base64") }
+        this.ledger.put("tx", signed_tx)
     }
 
 }
